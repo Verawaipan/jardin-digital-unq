@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Universidad la Hacemos Todos — Jardín Digital Colectivo UNQ</title>
+  
+  <!-- SEO & Social Media Metadata -->
+  <meta name="description" content="Instalación artística interactiva de la Universidad Nacional de Quilmes (UNQ). Representando que la universidad es una construcción colectiva.">
+  <meta property="og:title" content="La Universidad la Hacemos Todos — Jardín Digital Colectivo UNQ">
+  <meta property="og:description" content="Aportá tu flor al jardín digital colectivo de la UNQ.">
+  
+  <!-- Google Fonts: Inter para UI, Source Serif 4 para identidad poética y serif oficial -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;0,700;1,300&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Libraries (Socket.io served by Node, p5.js from CDN) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+  <!-- Contenedor del Canvas de p5.js (Jardín de ladrillos y flores) -->
+  <div id="canvas-container"></div>
+
+  <!-- Capa de Interfaz de Usuario -->
+  <div id="ui-wrapper">
+    
+    <!-- 1. PANTALLA INICIAL DE PARTICIPACIÓN (FORMULARIO PRINCIPAL) -->
+    <!-- Se muestra por defecto. Al enviar se oculta para revelar el jardín -->
+    <div id="landing-screen" class="landing-view">
+      <div class="landing-card">
+        <div class="landing-logo">
+          <!-- Logo Oficial PNG provisto por el usuario -->
+          <img src="logo-unq.png" class="unq-logo-img-large" alt="Logo Oficial Universidad Nacional de Quilmes">
+        </div>
+        <h1 class="landing-title">La universidad la hacemos todos</h1>
+        <p class="landing-subtitle">
+          Sumá tu aporte a este jardín colectivo. Las flores representan a las personas que construyen la universidad día a día.
+        </p>
+        
+        <form id="seed-form" onsubmit="handleFormSubmit(event)">
+          <div class="input-group">
+            <label for="contribution-input" class="input-question">¿Qué te aporta la universidad?</label>
+            <input 
+              type="text" 
+              id="contribution-input" 
+              placeholder="Ej: conocimiento, amistades, herramientas..." 
+              maxlength="30" 
+              required 
+              autocomplete="off"
+            >
+            <span class="input-char-counter">0 / 30</span>
+          </div>
+          
+          <button type="submit" class="btn-submit" id="btn-submit">
+            <span class="btn-text">Plantar semilla</span>
+            <span class="btn-sparkle">✦</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. ENCABEZADO INSTITUCIONAL DE MURAL (Solo visible cuando se visualiza el jardín) -->
+    <header class="main-header" id="main-header">
+      <div class="logo-container">
+        <!-- Logo Oficial PNG de tamaño reducido para el cabezal -->
+        <img src="logo-unq.png" class="unq-logo-img-small" alt="Logo UNQ">
+      </div>
+      <div class="header-divider"></div>
+      <div class="header-concept">
+        <span class="concept-title">La universidad la hacemos todos</span>
+        <span class="concept-tagline">Instalación Artística Colectiva</span>
+      </div>
+    </header>
+
+    <!-- 3. BOTÓN FLOTANTE DE RETORNO (Se muestra en el jardín para permitir volver a plantar) -->
+    <button id="btn-plant-another" class="btn-floating-trigger" onclick="returnToForm()">
+      <span class="btn-icon">🌱</span>
+      <span class="btn-text-floating">Plantar otra flor</span>
+    </button>
+
+    <!-- 4. NOTIFICACIÓN DE ÉXITO -->
+    <div class="success-notification" id="success-notification">
+      <div class="notification-body">
+        <span class="notification-icon">🌱</span>
+        <div class="notification-text">
+          <h3>¡Semilla plantada!</h3>
+          <p>Mirá la pared para ver crecer tu flor...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. PANEL INFORMATIVO DE PROYECCIÓN (Sólo visible en modo pantalla/proyección) -->
+    <div class="projection-info" id="projection-info">
+      <div class="info-content">
+        <h2>Jardín Colectivo UNQ</h2>
+        <p>Escaneá el código QR con tu celular para sumar tu flor en tiempo real.</p>
+        <div class="qr-container">
+          <img id="qr-image" src="" alt="QR para participar">
+        </div>
+        <p class="qr-url" id="qr-url-text"></p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Botón de control de modo en la esquina inferior izquierda -->
+  <button class="mode-toggle-btn" onclick="toggleScreenMode()" title="Cambiar modo de pantalla">
+    📺 Modo Pantalla
+  </button>
+
+  <!-- Client-side JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,626 @@
+/* PALETA DE COLORES Y VARIABLES INSTITUCIONALES (UNQ) */
+:root {
+  /* Colores oficiales UNQ */
+  --unq-red: #A6192E;        /* Pantone 187 C (Rojo institucional) */
+  --unq-grey: #51534A;       /* Pantone 418 C (Gris/oliva oscuro) */
+  --unq-red-light: #c22b40;
+  
+  /* Tonos de interfaz y glassmorphism (Temática Oscura/Cálida) */
+  --glass-bg: rgba(43, 17, 12, 0.86); /* Fondo de vidrio color terracota oscuro */
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --text-light: #fbeee8;
+  --text-muted: #c9b1a9;
+  
+  --shadow-light: rgba(0, 0, 0, 0.2);
+  --shadow-medium: rgba(0, 0, 0, 0.4);
+  --shadow-heavy: rgba(0, 0, 0, 0.6);
+  
+  /* Tipografías */
+  --font-ui: 'Inter', -apple-system, sans-serif;
+  --font-poetry: 'Source Serif 4', Georgia, serif;
+}
+
+/* NORMALIZACIÓN Y CONFIGURACIÓN BÁSICA */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  background-color: #1e0906; /* Color de mortero profundo */
+  color: var(--text-light);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Textura granulada decorativa general */
+body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.045;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* CONTENEDOR DEL CANVAS DE p5.js */
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  transition: filter 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Efecto de desenfoque e inmersión en el canvas cuando está el formulario abierto */
+body.show-form #canvas-container {
+  filter: blur(6px) brightness(0.6);
+  transform: scale(1.02);
+}
+
+body.show-garden #canvas-container {
+  filter: blur(0px) brightness(1.0);
+  transform: scale(1.0);
+}
+
+/* CAPA DE LA INTERFAZ DE USUARIO */
+#ui-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none; /* Permite clicks en el canvas */
+  padding: 24px;
+}
+
+#ui-wrapper * {
+  pointer-events: auto; /* Habilita clicks en botones/inputs */
+}
+
+/* 1. PANTALLA INICIAL DE PARTICIPACIÓN (LANDING SCREEN) */
+.landing-view {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 20px;
+}
+
+/* Estado de visualización */
+body.show-form .landing-view {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1.0);
+}
+
+body.show-garden .landing-view {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.9) translateY(-30px);
+  pointer-events: none;
+}
+
+/* Tarjeta de bienvenida */
+.landing-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: 0 20px 50px var(--shadow-heavy);
+  text-align: center;
+  transition: transform 0.5s ease;
+}
+
+.landing-logo {
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Integrar el logo oficial. Usamos mix-blend-mode: screen para
+   hacer transparente el fondo negro de la imagen oficial */
+.unq-logo-img-large {
+  height: 75px;
+  width: auto;
+  max-width: 100%;
+  display: block;
+  mix-blend-mode: screen; /* Filtra el fondo negro haciéndolo transparente */
+}
+
+.landing-title {
+  font-family: var(--font-poetry);
+  font-weight: 700;
+  font-size: 1.85rem;
+  line-height: 1.25;
+  color: #ffffff;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.landing-subtitle {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-bottom: 32px;
+}
+
+/* Inputs del Formulario */
+.input-group {
+  margin-bottom: 28px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.input-question {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+#contribution-input {
+  width: 100%;
+  padding: 16px 18px;
+  font-family: var(--font-poetry);
+  font-size: 1.2rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+#contribution-input:focus {
+  border-color: var(--unq-red);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 5px rgba(166, 25, 46, 0.25);
+}
+
+.input-char-counter {
+  position: absolute;
+  right: 12px;
+  bottom: -22px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Botón Plantar */
+.btn-submit {
+  width: 100%;
+  padding: 16px 24px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: #ffffff;
+  background-color: var(--unq-red);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 15px rgba(166, 25, 46, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-submit:hover {
+  background-color: var(--unq-red-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(166, 25, 46, 0.5);
+}
+
+.btn-sparkle {
+  font-size: 1.1rem;
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* 2. ENCABEZADO INSTITUCIONAL DE MURAL (GARDEN VIEW) */
+.main-header {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 12px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 6px 25px var(--shadow-light);
+  max-width: fit-content;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 20;
+}
+
+/* Control de visibilidad del cabezal */
+body.show-form .main-header {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-20px);
+  pointer-events: none;
+}
+
+body.show-garden .main-header {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.unq-logo-img-small {
+  height: 38px;
+  width: auto;
+  display: block;
+  mix-blend-mode: screen; /* Transparente si tiene fondo negro */
+}
+
+.header-divider {
+  width: 1px;
+  height: 28px;
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.header-concept {
+  display: flex;
+  flex-direction: column;
+}
+
+.concept-title {
+  font-family: var(--font-poetry);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.concept-tagline {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--unq-red-light);
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+
+/* 3. BOTÓN FLOTANTE: PLANTAR OTRA FLOR */
+.btn-plant-another {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+}
+
+.btn-floating-trigger {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 28px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 1.02rem;
+  color: #ffffff;
+  background-color: var(--unq-red);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(166, 25, 46, 0.4);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 25;
+}
+
+/* Control de visibilidad del botón flotante */
+body.show-form .btn-floating-trigger {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.8) translateY(20px);
+  pointer-events: none;
+}
+
+body.show-garden .btn-floating-trigger {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1.0) translateY(0);
+}
+
+.btn-floating-trigger:hover {
+  background-color: var(--unq-red-light);
+  transform: scale(1.05) translateY(-3px);
+  box-shadow: 0 12px 30px rgba(166, 25, 46, 0.5);
+}
+
+
+/* 4. NOTIFICACIÓN DE ÉXITO */
+.success-notification {
+  position: fixed;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--glass-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px var(--shadow-medium);
+  padding: 16px 24px;
+  border-radius: 14px;
+  z-index: 120;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  opacity: 0;
+  pointer-events: none;
+  max-width: 90%;
+  width: 380px;
+  text-align: left;
+}
+
+.success-notification.show {
+  top: 24px;
+  opacity: 1;
+}
+
+.notification-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.notification-icon {
+  font-size: 2.2rem;
+}
+
+.notification-text h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--unq-red-light);
+  margin-bottom: 2px;
+}
+
+.notification-text p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+
+/* 5. MODO PROYECCIÓN - QR / INFO FLOTANTE */
+.projection-info {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px var(--shadow-medium);
+  padding: 20px;
+  width: 240px;
+  text-align: center;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  z-index: 12;
+}
+
+.projection-info.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.projection-info h2 {
+  font-family: var(--font-poetry);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #ffffff;
+}
+
+.projection-info p {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.qr-container {
+  background: #ffffff;
+  padding: 8px;
+  border-radius: 8px;
+  display: inline-block;
+  box-shadow: inset 0 0 4px rgba(0,0,0,0.1);
+  margin-bottom: 8px;
+}
+
+.qr-container img {
+  display: block;
+  width: 140px;
+  height: 140px;
+}
+
+.qr-url {
+  font-family: monospace;
+  font-size: 0.7rem !important;
+  word-break: break-all;
+  color: var(--unq-red-light) !important;
+  font-weight: bold;
+}
+
+
+/* 6. BOTÓN SECRETO CAMBIO DE MODO */
+.mode-toggle-btn {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+  z-index: 30;
+}
+
+.mode-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+
+/* 7. REGLAS COMPORTAMIENTO MODO PROYECCIÓN (SCREEN) */
+body.mode-projection .landing-view {
+  display: none !important; /* Esconde formulario completamente */
+}
+
+body.mode-projection .btn-floating-trigger {
+  display: none !important; /* Esconde botón flotante */
+}
+
+body.mode-projection #canvas-container {
+  filter: none !important;
+  transform: none !important; /* Asegura nitidez */
+}
+
+body.mode-projection .main-header {
+  padding: 16px 36px;
+  border-radius: 18px;
+  top: 32px;
+  left: 32px;
+  max-width: 500px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+body.mode-projection .concept-title {
+  font-size: 1.15rem;
+}
+
+body.mode-projection .concept-tagline {
+  font-size: 0.78rem;
+}
+
+body.mode-projection .unq-logo-img-small {
+  height: 48px;
+}
+
+
+/* ADAPTACIÓN RESPONSIVA MÓVILES */
+@media (max-width: 520px) {
+  #ui-wrapper {
+    padding: 16px;
+  }
+  
+  .main-header {
+    width: 100%;
+    max-width: 100%;
+    align-self: center;
+    padding: 10px 16px;
+    gap: 12px;
+    border-radius: 12px;
+    top: 16px;
+    left: 16px;
+  }
+  
+  .unq-logo-img-small {
+    height: 32px;
+  }
+  
+  .header-divider {
+    height: 22px;
+  }
+  
+  .concept-title {
+    font-size: 0.8rem;
+  }
+  
+  .concept-tagline {
+    font-size: 0.6rem;
+  }
+  
+  .btn-floating-trigger {
+    width: calc(100% - 32px);
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    justify-content: center;
+  }
+  
+  .landing-card {
+    padding: 24px;
+    border-radius: 20px;
+  }
+  
+  .unq-logo-img-large {
+    height: 55px;
+  }
+  
+  .landing-title {
+    font-size: 1.45rem;
+  }
+  
+  .landing-subtitle {
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+  }
+  
+  #contribution-input {
+    font-size: 1.05rem;
+    padding: 12px 14px;
+  }
+  
+  .btn-submit {
+    padding: 14px;
+  }
+
+  .projection-info {
+    bottom: 80px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%) translateY(20px);
+    width: calc(100% - 32px);
+    max-width: 280px;
+  }
+  
+  .projection-info.show {
+    transform: translateX(-50%) translateY(0);
+  }
+}

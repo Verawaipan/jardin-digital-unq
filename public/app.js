@@ -1,10 +1,25 @@
 // ===================================================================
-// CONFIGURACIÓN DE CONECTIVIDAD Y ESTADO
+// CONFIGURACIÓN DE CONECTIVIDAD Y ESTADO (SUPABASE)
 // ===================================================================
-let socket;
-let isSocketConnected = false;
+const SUPABASE_URL = 'https://bchnsvnglolhueixaddw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjaG5zdm5nbG9saHVlaXhhZGR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzOTQxOTksImV4cCI6MjA5Nzk3MDE5OX0.wAeCVYinaurN12dW6MnJ1R99pb8Zl4pgR2NsyKoIDzQ';
+
+let supabaseClient;
+try {
+  if (window.supabase) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log("Cliente de Supabase inicializado correctamente.");
+  } else {
+    console.warn("Biblioteca de Supabase no disponible en este momento.");
+  }
+} catch (e) {
+  console.error("Error al inicializar Supabase:", e);
+}
+
 let flowers = []; // Array de flores cargadas en el jardín
 let isProjectionMode = false;
+let lastFetchTime = null; // Para la sincronización incremental
+
 
 // Configuración de animación y crecimiento
 const ANIM_DURATION_FRAMES = 360; // 6 segundos a 60fps
@@ -75,58 +90,29 @@ function hashString(str) {
 }
 
 // ===================================================================
-// CONEXIÓN ROBUSTA A SOCKETS Y DETECCIÓN OFFLINE
+// ESTADO DE CONEXIÓN A BASE DE DATOS
 // ===================================================================
-try {
-  if (typeof io !== 'undefined') {
-    socket = io();
-    isSocketConnected = true;
-    console.log("Socket.io cargado. Conectando al servidor...");
-  } else {
-    console.warn("Socket.io no disponible. Iniciando en modo local (offline).");
-    isSocketConnected = false;
-  }
-} catch (e) {
-  console.warn("Error al inicializar Socket.io:", e);
-  isSocketConnected = false;
-}
+// La conectividad se gestiona a través de consultas HTTPS directas a Supabase
+
 
 // ===================================================================
 // INICIALIZACIÓN DE LA INTERFAZ
 // ===================================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
-  
-  // Limpieza única de datos de testing antiguos de forma automática
-  if (!localStorage.getItem('unq_digital_garden_cleaned_v3')) {
-    localStorage.removeItem('unq_digital_garden_flowers');
-    localStorage.setItem('unq_digital_garden_cleaned_v3', 'true');
-    console.log("Caché local de flores de prueba eliminada automáticamente.");
-  }
-  
-  // Limpieza forzada de caché local si se especifica ?clear=true o ?reset=true
-  if (urlParams.get('clear') === 'true' || urlParams.get('reset') === 'true') {
-    localStorage.removeItem('unq_digital_garden_flowers');
-    flowers = [];
-    console.log("Flores y caché local (localStorage) eliminadas con éxito.");
-    
-    // Limpiar el parámetro de la URL sin recargar la página
-    urlParams.delete('clear');
-    urlParams.delete('reset');
-    const newQuery = urlParams.toString();
-    const newUrl = window.location.pathname + (newQuery ? '?' + newQuery : '');
-    window.history.replaceState({}, '', newUrl);
-  }
   
   isProjectionMode = urlParams.get('mode') === 'screen' || urlParams.get('mode') === 'projection';
   
   updateDOMForMode();
   setupFormListeners();
   
-  if (isSocketConnected) {
-    setupSocketListeners();
+  if (supabaseClient) {
+    // Cargar todas las flores del jardín compartido
+    await loadSupabaseFlowers();
+    // Iniciar sincronización automática cada 5 segundos
+    setInterval(syncNewFlowers, 5000);
   } else {
-    loadLocalFlowers();
+    console.error("No se pudo conectar a la base de datos colectiva (Supabase).");
   }
 });
 
@@ -191,7 +177,7 @@ function returnToForm() {
 }
 
 // Envío del aporte
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
   e.preventDefault();
   const input = document.getElementById('contribution-input');
   const btn = document.getElementById('btn-submit');
@@ -204,12 +190,10 @@ function handleFormSubmit(e) {
     // TRANSICIÓN AL JARDÍN INMEDIATA PARA VER EL CRECIMIENTO
     transitionToGarden();
     
-    if (isSocketConnected) {
-      // Enviar al servidor real-time
-      socket.emit('plant_seed', { text: text });
+    if (supabaseClient) {
+      await plantFlower(text);
     } else {
-      // Simular plantado local
-      plantFlowerLocally(text);
+      console.warn("Supabase no inicializado, no se pudo guardar.");
     }
     
     showSuccessNotification();
@@ -243,50 +227,76 @@ function toggleScreenMode() {
 }
 
 // ===================================================================
-// LÓGICA MODO DESCONECTADO (MOCK / LOCALSTORAGE)
+// LÓGICA DE PERSISTENCIA Y SINCRONIZACIÓN CON SUPABASE
 // ===================================================================
-function loadLocalFlowers() {
-  let stored = localStorage.getItem('unq_digital_garden_flowers');
-  if (stored) {
-    try {
-      const data = JSON.parse(stored);
-      flowers = data.map(f => createFlowerObject(f, true));
-      console.log(`Cargadas ${flowers.length} flores desde localStorage.`);
-    } catch (e) {
-      loadMockInitialFlowers();
+async function loadSupabaseFlowers() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('flowers')
+      .select('*')
+      .order('created_at', { ascending: true });
+      
+    if (error) throw error;
+    
+    if (data) {
+      flowers = data.map(f => createFlowerObject({
+        id: f.id,
+        text: f.text,
+        x: Number(f.x),
+        y: Number(f.y),
+        seed: Number(f.seed),
+        timestamp: f.created_at
+      }, true));
+      
+      if (data.length > 0) {
+        lastFetchTime = data[data.length - 1].created_at;
+      }
+      console.log(`Cargadas ${flowers.length} flores desde la base de datos de Supabase.`);
     }
-  } else {
-    loadMockInitialFlowers();
+  } catch (err) {
+    console.error("Error al cargar flores de Supabase:", err);
   }
 }
 
-function loadMockInitialFlowers() {
-  flowers = INITIAL_MOCK_FLOWERS.map((f, i) => {
-    return createFlowerObject({
-      id: 'mock-' + i,
-      text: f.text,
-      x: f.x,
-      y: f.y,
-      seed: f.seed,
-      timestamp: new Date().toISOString()
-    }, true);
-  });
-  saveLocalFlowers();
+async function syncNewFlowers() {
+  try {
+    let query = supabaseClient
+      .from('flowers')
+      .select('*');
+      
+    if (lastFetchTime) {
+      query = query.gt('created_at', lastFetchTime);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      data.forEach(f => {
+        // Evitar duplicar flores existentes
+        if (!flowers.some(existing => existing.id === f.id)) {
+          const newFlower = createFlowerObject({
+            id: f.id,
+            text: f.text,
+            x: Number(f.x),
+            y: Number(f.y),
+            seed: Number(f.seed),
+            timestamp: f.created_at
+          }, false); // false para animar crecimiento
+          flowers.push(newFlower);
+        }
+      });
+      
+      lastFetchTime = data[data.length - 1].created_at;
+      console.log(`Sincronizadas ${data.length} flores nuevas desde Supabase.`);
+    }
+  } catch (err) {
+    console.error("Error al sincronizar nuevas flores de Supabase:", err);
+  }
 }
 
-function saveLocalFlowers() {
-  const simple = flowers.map(f => ({
-    id: f.id,
-    text: f.text,
-    x: f.normX,
-    y: f.normY,
-    seed: f.seed,
-    timestamp: new Date().toISOString()
-  }));
-  localStorage.setItem('unq_digital_garden_flowers', JSON.stringify(simple));
-}
-
-// Comprueba si una coordenada interfiere con el logo en la resolución actual del canvas
+// Comprueba si una coordenada interfiere con el logo en la resolución actual del canvas (margen mínimo de 10px)
 function overlapsLogoLocal(testX, testY, W, H) {
   const cx = W * 0.5;
   const cy = isProjectionMode ? H * 0.46 : H * 0.4;
@@ -295,36 +305,70 @@ function overlapsLogoLocal(testX, testY, W, H) {
   const x = testX * W;
   const y = testY * H;
   
-  // 1. Validar colisión de la base de la semilla con el logo (margen de 25px)
+  // 1. Validar colisión de la base de la semilla con el logo (margen mínimo de 10px)
   const dxBase = x - cx;
   const dyBase = y - cy;
   const dBase = Math.sqrt(dxBase * dxBase + dyBase * dyBase);
-  if (dBase < logoR + 25) return true;
+  if (dBase < logoR + 10) return true;
   
-  // 2. Validar colisión de la cabeza de la flor (estimando que crece 125px hacia arriba con margen de 45px)
+  // 2. Validar colisión de la cabeza de la flor (crece hacia arriba unos 125px con margen mínimo de 10px)
   const headX = x;
   const headY = y - 125;
   const dxHead = headX - cx;
   const dyHead = headY - cy;
   const dHead = Math.sqrt(dxHead * dxHead + dyHead * dyHead);
-  if (dHead < logoR + 45) return true;
+  if (dHead < logoR + 10) return true;
   
   return false;
 }
 
-// Algoritmo local de anti-colisión para modo offline (evitando logo central)
+// Algoritmo local de generación radial concéntrica de mejor candidato
 function getSpacedCoordinatesLocal() {
+  const W = width;
+  const H = height;
+  const cx = W * 0.5;
+  const cy = isProjectionMode ? H * 0.46 : H * 0.4;
+  const logoR = min(W, H) * 0.35;
+  
   let bestX = Math.random() * 0.8 + 0.1;
   let bestY = Math.random() * 0.65 + 0.15;
   let maxMinDistance = -1;
+  let foundValid = false;
 
-  // Probar 100 posiciones aleatorias para buscar una que esté fuera del logo central y óptimamente espaciada
-  for (let i = 0; i < 100; i++) {
-    const testX = Math.random() * 0.8 + 0.1;
-    const testY = Math.random() * 0.65 + 0.15;
+  // Probar 150 candidatos para buscar la mejor distribución radial espaciada
+  for (let i = 0; i < 150; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const u = Math.random();
+    const maxDist = Math.max(W, H) * 0.7;
+    // u^2 concentra posiciones densamente justo en la frontera del logo
+    const d = (logoR + 12) + maxDist * (u * u);
     
-    // Evitar el área ocupada por el logo y el crecimiento de la flor hacia él
-    if (overlapsLogoLocal(testX, testY, width, height)) {
+    const px = cx + d * Math.cos(theta);
+    const py = cy + d * Math.sin(theta);
+    
+    const testX = px / W;
+    const testY = py / H;
+    
+    // Limitar a márgenes visibles (más restrictivos en móvil para evitar tapar UI)
+    const isMobile = W < 480;
+    const minY = isMobile ? 0.18 : 0.1;
+    const maxY = isMobile ? 0.82 : 0.9;
+    
+    if (testX < 0.05 || testX > 0.95 || testY < minY || testY > maxY) {
+      continue;
+    }
+    
+    // Validar base
+    const dBase = Math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+    if (dBase < logoR + 10) {
+      continue;
+    }
+    
+    // Validar cabeza
+    const headX = px;
+    const headY = py - 110;
+    const dHead = Math.sqrt((headX - cx) * (headX - cx) + (headY - cy) * (headY - cy));
+    if (dHead < logoR + 10) {
       continue;
     }
 
@@ -332,56 +376,79 @@ function getSpacedCoordinatesLocal() {
     for (const f of flowers) {
       const dx = testX - f.normX;
       const dy = testY - f.normY;
-      const d = Math.sqrt(dx * dx + dy * dy);
-      if (d < minDistance) minDistance = d;
+      const distVal = Math.sqrt(dx * dx + dy * dy);
+      if (distVal < minDistance) {
+        minDistance = distVal;
+      }
     }
 
     if (minDistance > maxMinDistance) {
       maxMinDistance = minDistance;
       bestX = testX;
       bestY = testY;
+      foundValid = true;
     }
   }
+
+  // Fallback si no hay candidato válido en el anillo
+  if (!foundValid) {
+    for (let i = 0; i < 50; i++) {
+      const testX = Math.random() * 0.8 + 0.1;
+      const testY = Math.random() * 0.65 + 0.15;
+      if (!overlapsLogoLocal(testX, testY, W, H)) {
+        return { x: testX, y: testY };
+      }
+    }
+  }
+
   return { x: bestX, y: bestY };
 }
 
-function plantFlowerLocally(text) {
+async function plantFlower(text) {
   const coords = getSpacedCoordinatesLocal();
-  const flowerData = {
-    id: 'local-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+  const seed = Math.floor(Math.random() * 1000000);
+  
+  const newFlowerData = {
     text: text,
     x: coords.x,
     y: coords.y,
-    seed: Math.floor(Math.random() * 1000000),
-    timestamp: new Date().toISOString()
+    seed: seed
   };
-
-  const newFlower = createFlowerObject(flowerData, false);
-  flowers.push(newFlower);
-  saveLocalFlowers();
-}
-
-// ===================================================================
-// LÓGICA DE SOCKETS (ONLINE)
-// ===================================================================
-function setupSocketListeners() {
-  socket.on('initial_flowers', (data) => {
-    if (data.length === 0) {
-      // Si el servidor se reinició y está vacío, limpiar la caché local
-      localStorage.removeItem('unq_digital_garden_flowers');
-      flowers = [];
-    } else {
-      flowers = data.map(f => createFlowerObject(f, true));
-      saveLocalFlowers(); // Sincronizar localmente
-    }
-  });
-
-  socket.on('grow_flower', (data) => {
-    if (!flowers.some(f => f.id === data.id)) {
-      const newFlower = createFlowerObject(data, false);
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('flowers')
+      .insert([newFlowerData])
+      .select();
+      
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      const inserted = data[0];
+      
+      // Mostrar inmediatamente en la pantalla local iniciándose el crecimiento
+      const newFlower = createFlowerObject({
+        id: inserted.id,
+        text: inserted.text,
+        x: Number(inserted.x),
+        y: Number(inserted.y),
+        seed: Number(inserted.seed),
+        timestamp: inserted.created_at
+      }, false); // false para que empiece a crecer
+      
       flowers.push(newFlower);
+      
+      // Actualizar lastFetchTime
+      if (!lastFetchTime || inserted.created_at > lastFetchTime) {
+        lastFetchTime = inserted.created_at;
+      }
+      
+      console.log(`Flor plantada con éxito en el jardín colectivo: "${text}"`);
     }
-  });
+  } catch (err) {
+    console.error("Error al guardar flor en Supabase:", err);
+    alert("Hubo un error al plantar tu flor. Por favor, verifica tu conexión e inténtalo de nuevo.");
+  }
 }
 
 // ===================================================================

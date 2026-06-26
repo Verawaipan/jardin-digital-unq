@@ -296,10 +296,11 @@ async function syncNewFlowers() {
   }
 }
 
-// Comprueba si una coordenada interfiere con el logo en la resolución actual del canvas (margen mínimo de 10px)
+// Comprueba si una coordenada interfiere con el logo en el espacio virtual (margen mínimo de 10px)
 function overlapsLogoLocal(testX, testY, W, H) {
   const cx = W * 0.5;
-  const cy = isProjectionMode ? H * 0.46 : H * 0.4;
+  // Usar siempre centro de 0.4 en el espacio virtual para consistencia
+  const cy = H * 0.4;
   const logoR = min(W, H) * 0.35; // 70% de la menor dimensión / 2
   
   const x = testX * W;
@@ -322,22 +323,21 @@ function overlapsLogoLocal(testX, testY, W, H) {
   return false;
 }
 
-// Algoritmo local de generación radial concéntrica de mejor candidato
+// Algoritmo local de generación radial concéntrica de mejor candidato en coordenadas virtuales (1920x1080)
 function getSpacedCoordinatesLocal() {
-  const W = width;
-  const H = height;
-  const cx = W * 0.5;
-  const cy = isProjectionMode ? H * 0.46 : H * 0.4;
-  const logoR = min(W, H) * 0.35;
+  const W = 1920;
+  const H = 1080;
+  const cx = W * 0.5; // 960
+  const cy = H * 0.4; // 432 (siempre usar el centro virtual standard de 0.4 para consistencia)
+  const logoR = H * 0.35; // 378
   
   let bestX = cx / W;
   let bestY = cy / H;
   let maxMinDistance = -1;
   let foundValid = false;
 
-  const isMobile = W < 480;
-  const minY = isMobile ? 0.18 : 0.1;
-  const maxY = isMobile ? 0.82 : 0.9;
+  const minY = 0.15;
+  const maxY = 0.85;
 
   // Probar 150 candidatos para buscar la mejor distribución radial espaciada en el anillo
   for (let i = 0; i < 150; i++) {
@@ -346,7 +346,7 @@ function getSpacedCoordinatesLocal() {
     
     // Radio del anillo
     const ringInner = logoR + 10; // Zona de exclusión mínima de 10px
-    const ringOuter = logoR + (isMobile ? min(W, H) * 0.35 : min(W, H) * 0.45);
+    const ringOuter = logoR + H * 0.45; // 378 + 486 = 864px
     const ringWidth = ringOuter - ringInner;
     
     // Usar u^2 para agrupar denso cerca del logo (u^2 es cercano a 0)
@@ -358,12 +358,12 @@ function getSpacedCoordinatesLocal() {
     const testX = px / W;
     const testY = py / H;
     
-    // Limitar a márgenes visibles
+    // Limitar a márgenes de la zona segura virtual
     if (testX < 0.05 || testX > 0.95 || testY < minY || testY > maxY) {
       continue;
     }
     
-    // Validar colisión base y cabeza con el logo (margen mínimo de 10px)
+    // Validar colisión base y cabeza con el logo en coordenadas virtuales (W=1920, H=1080)
     if (overlapsLogoLocal(testX, testY, W, H)) {
       continue;
     }
@@ -392,7 +392,7 @@ function getSpacedCoordinatesLocal() {
       const theta = Math.random() * Math.PI * 2;
       const u = Math.random();
       const ringInner = logoR + 10;
-      const ringOuter = logoR + (isMobile ? min(W, H) * 0.35 : min(W, H) * 0.45);
+      const ringOuter = logoR + H * 0.45;
       const ringWidth = ringOuter - ringInner;
       const d = ringInner + ringWidth * (u * u);
       
@@ -766,6 +766,10 @@ function drawFlower(flower) {
     x = cx + r * Math.cos(theta);
     y = cy + r * Math.sin(theta);
   }
+
+  // Asegurar que las coordenadas físicas calculadas se mantengan visibles en el dispositivo actual
+  x = constrain(x, width * 0.05, width * 0.95);
+  y = constrain(y, height * 0.15, height * 0.85);
 
   const p = flower.growProgress;
   

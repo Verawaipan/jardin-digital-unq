@@ -330,18 +330,27 @@ function getSpacedCoordinatesLocal() {
   const cy = isProjectionMode ? H * 0.46 : H * 0.4;
   const logoR = min(W, H) * 0.35;
   
-  let bestX = Math.random() * 0.8 + 0.1;
-  let bestY = Math.random() * 0.65 + 0.15;
+  let bestX = cx / W;
+  let bestY = cy / H;
   let maxMinDistance = -1;
   let foundValid = false;
 
-  // Probar 150 candidatos para buscar la mejor distribución radial espaciada
+  const isMobile = W < 480;
+  const minY = isMobile ? 0.18 : 0.1;
+  const maxY = isMobile ? 0.82 : 0.9;
+
+  // Probar 150 candidatos para buscar la mejor distribución radial espaciada en el anillo
   for (let i = 0; i < 150; i++) {
     const theta = Math.random() * Math.PI * 2;
     const u = Math.random();
-    const maxDist = Math.max(W, H) * 0.7;
-    // u^2 concentra posiciones densamente justo en la frontera del logo
-    const d = (logoR + 12) + maxDist * (u * u);
+    
+    // Radio del anillo
+    const ringInner = logoR + 10; // Zona de exclusión mínima de 10px
+    const ringOuter = logoR + (isMobile ? min(W, H) * 0.35 : min(W, H) * 0.45);
+    const ringWidth = ringOuter - ringInner;
+    
+    // Usar u^2 para agrupar denso cerca del logo (u^2 es cercano a 0)
+    const d = ringInner + ringWidth * (u * u);
     
     const px = cx + d * Math.cos(theta);
     const py = cy + d * Math.sin(theta);
@@ -349,26 +358,13 @@ function getSpacedCoordinatesLocal() {
     const testX = px / W;
     const testY = py / H;
     
-    // Limitar a márgenes visibles (más restrictivos en móvil para evitar tapar UI)
-    const isMobile = W < 480;
-    const minY = isMobile ? 0.18 : 0.1;
-    const maxY = isMobile ? 0.82 : 0.9;
-    
+    // Limitar a márgenes visibles
     if (testX < 0.05 || testX > 0.95 || testY < minY || testY > maxY) {
       continue;
     }
     
-    // Validar base
-    const dBase = Math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
-    if (dBase < logoR + 10) {
-      continue;
-    }
-    
-    // Validar cabeza
-    const headX = px;
-    const headY = py - 110;
-    const dHead = Math.sqrt((headX - cx) * (headX - cx) + (headY - cy) * (headY - cy));
-    if (dHead < logoR + 10) {
+    // Validar colisión base y cabeza con el logo (margen mínimo de 10px)
+    if (overlapsLogoLocal(testX, testY, W, H)) {
       continue;
     }
 
@@ -390,15 +386,30 @@ function getSpacedCoordinatesLocal() {
     }
   }
 
-  // Fallback si no hay candidato válido en el anillo
+  // Fallback si no hay candidato con espaciado ideal: buscar cualquier posición válida en el anillo
   if (!foundValid) {
-    for (let i = 0; i < 50; i++) {
-      const testX = Math.random() * 0.8 + 0.1;
-      const testY = Math.random() * 0.65 + 0.15;
-      if (!overlapsLogoLocal(testX, testY, W, H)) {
-        return { x: testX, y: testY };
+    for (let i = 0; i < 100; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const u = Math.random();
+      const ringInner = logoR + 10;
+      const ringOuter = logoR + (isMobile ? min(W, H) * 0.35 : min(W, H) * 0.45);
+      const ringWidth = ringOuter - ringInner;
+      const d = ringInner + ringWidth * (u * u);
+      
+      const px = cx + d * Math.cos(theta);
+      const py = cy + d * Math.sin(theta);
+      
+      const testX = px / W;
+      const testY = py / H;
+      
+      if (testX >= 0.05 && testX <= 0.95 && testY >= minY && testY <= maxY) {
+        if (!overlapsLogoLocal(testX, testY, W, H)) {
+          return { x: testX, y: testY };
+        }
       }
     }
+    // Fallback absoluto por si acaso
+    return { x: Math.random() * 0.8 + 0.1, y: Math.random() * 0.6 + 0.2 };
   }
 
   return { x: bestX, y: bestY };
@@ -547,6 +558,12 @@ function setup() {
 
 function draw() {
   image(bgGraphics, 0, 0);
+  
+  // Evitar dibujar las flores si el formulario de bienvenida está activo
+  // Esto evita superposiciones de flores detrás del cuadro de texto en móvil y escritorio
+  if (document.body.classList.contains('show-form') && !isProjectionMode) {
+    return;
+  }
   
   // Dibujar todas las flores
   for (let i = 0; i < flowers.length; i++) {

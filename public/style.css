@@ -285,7 +285,7 @@ body.show-garden .landing-view {
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  padding: 8px 12px; /* Más compacto en altura */
+  padding: 6px 10px; /* Aún más compacto para maximizar el jardín */
   border-radius: 12px;
   border: 1px solid var(--glass-border);
   box-shadow: 0 6px 25px var(--shadow-light);
@@ -307,7 +307,7 @@ body.show-garden .main-header {
 }
 
 .unq-logo-img-small {
-  height: 26px; /* Más bajo para dar más pantalla al jardín */
+  height: 22px; /* Reducido un poco más en móviles */
   width: auto;
   display: block;
   mix-blend-mode: screen;
@@ -315,7 +315,7 @@ body.show-garden .main-header {
 
 .header-divider {
   width: 1px;
-  height: 18px;
+  height: 14px;
   background-color: rgba(255, 255, 255, 0.18);
 }
 
@@ -327,13 +327,13 @@ body.show-garden .main-header {
 .concept-title {
   font-family: var(--font-poetry);
   font-weight: 700;
-  font-size: 0.72rem; /* Compacto */
+  font-size: 0.65rem; /* Escalado proporcionalmente */
   color: #ffffff;
   letter-spacing: -0.01em;
 }
 
 .concept-tagline {
-  font-size: 0.55rem; /* Compacto */
+  font-size: 0.5rem; /* Escalado proporcionalmente */
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--unq-red-light);
@@ -344,11 +344,12 @@ body.show-garden .main-header {
 /* 3. BOTÓN FLOTANTE: PLANTAR OTRA FLOR - MÓVIL */
 .btn-floating-trigger {
   position: absolute;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom)); /* Respetar la safe-area en iPhone */
   left: 50%;
   transform: translateX(-50%); /* Centrado horizontal en móvil */
   width: auto;
-  max-width: max-content;
+  max-width: 90%; /* Evita desbordamiento en pantallas angostas */
+  box-sizing: border-box;
   min-height: 48px;
   display: flex;
   align-items: center;
@@ -358,6 +359,9 @@ body.show-garden .main-header {
   font-family: var(--font-ui);
   font-weight: 600;
   font-size: 0.9rem;
+  white-space: nowrap; /* Evita que el texto se parta en dos líneas */
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: #ffffff;
   background-color: var(--unq-red);
   border: none;
@@ -606,6 +610,8 @@ body.show-garden .btn-floating-trigger {
     border-radius: 50px;
     padding: 14px 28px;
     transform: none; /* Anular centrado de móvil */
+    max-width: none;
+    white-space: normal;
   }
 
   body.show-form .btn-floating-trigger {
@@ -743,9 +749,18 @@ body.mode-projection .unq-logo-img-small {
   height: 48px;
 }
 
-/* Ocultar información de proyección y QR en pantallas de celular (ancho < 768px) */
+/* Ocultar información de proyección, QR y botón de modo en pantallas de celular (ancho < 768px) */
 @media (max-width: 767px) {
   .projection-info {
     display: none !important;
+  }
+  .mode-toggle-btn {
+    display: none !important;
+  }
+  .btn-floating-trigger {
+    /* Ajustes específicos de compactado para pantallas de menos de 360px */
+    padding: 10px 16px;
+    font-size: 0.8rem;
+    gap: 6px;
   }
 }

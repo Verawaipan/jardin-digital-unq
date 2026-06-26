@@ -725,8 +725,48 @@ function drawMuralLogo() {
 // DIBUJADO DE LA FLOR Y SU ANIMACIÓN ORGÁNICA
 // ===================================================================
 function drawFlower(flower) {
-  const x = flower.normX * width;
-  const y = flower.normY * height;
+  // Recalcular posiciones de las flores según la relación de aspecto de la pantalla
+  const W_ref = 1920;
+  const H_ref = 1080;
+  
+  // Distancia y ángulo de la flor en la pantalla de referencia 16:9
+  const dx_ref = (flower.normX - 0.5) * W_ref;
+  const dy_ref = (flower.normY - 0.4) * H_ref;
+  const d_ref = Math.sqrt(dx_ref * dx_ref + dy_ref * dy_ref);
+  const theta = Math.atan2(dy_ref, dx_ref);
+  
+  const logoR_ref = H_ref * 0.35; // 378px
+  const d_rel = Math.max(10, d_ref - logoR_ref);
+  
+  const cx = width * 0.5;
+  const cy = isProjectionMode ? height * 0.46 : height * 0.4;
+  const logoR = min(width, height) * 0.35;
+  
+  const currentScale = min(width, height) / H_ref;
+  const d_rel_scaled = d_rel * currentScale;
+  
+  let x, y;
+  const currentAspect = width / height;
+  const referenceAspect = 16 / 9;
+  const isMobile = width < 480;
+  
+  if (currentAspect < referenceAspect) {
+    // Celulares (aspecto angosto como 9:19): estirar verticalmente para aprovechar el espacio
+    const aspectFactor = referenceAspect / currentAspect;
+    const verticalStretch = Math.min(1.8, Math.sqrt(aspectFactor));
+    
+    const rx = logoR + d_rel_scaled;
+    const ry = logoR + d_rel_scaled * verticalStretch;
+    
+    x = cx + rx * Math.cos(theta);
+    y = cy + ry * Math.sin(theta);
+  } else {
+    // Pantallas horizontales (escritorio 16:9 o superior)
+    const r = logoR + d_rel_scaled;
+    x = cx + r * Math.cos(theta);
+    y = cy + r * Math.sin(theta);
+  }
+
   const p = flower.growProgress;
   
   push();
@@ -735,6 +775,11 @@ function drawFlower(flower) {
   const windAngle = sin(frameCount * 0.015 + flower.windOffset) * 0.045 * p;
   translate(x, y);
   rotate(windAngle);
+  
+  // Reducir un 25% el tamaño de las flores en dispositivos móviles
+  if (isMobile) {
+    scale(0.75);
+  }
   
   if (p <= 0.35) {
     // ---------------------------------------------------------------
@@ -872,7 +917,9 @@ function drawFlower(flower) {
       
       drawPetals(flower);
       drawCenter(flower);
-      drawWordLabel(flower, bloomProgress);
+      
+      const headGlobalX = x + endX * (bloomProgress * flower.scaleMultiplier * (isMobile ? 0.75 : 1.0));
+      drawWordLabel(flower, bloomProgress, headGlobalX);
       
       pop();
     }
@@ -1075,13 +1122,10 @@ function drawCenter(flower) {
   pop();
 }
 
-function drawWordLabel(flower, bloomProgress) {
+function drawWordLabel(flower, bloomProgress, globalX) {
   if (!flower.text) return;
   
   push();
-  
-  const labelX = flower.petalLength + 8;
-  const labelY = 4;
   
   const textAlpha = map(bloomProgress, 0.72, 1.0, 0, 225, true);
   
@@ -1098,12 +1142,30 @@ function drawWordLabel(flower, bloomProgress) {
     const paddingH = 6;
     const paddingV = 3;
     
+    // Determinar si la flor está en la mitad derecha de la pantalla
+    // Si es así, dibujamos el texto a la izquierda de la flor para evitar que se corte en el borde derecho
+    const isRightHalf = globalX > width * 0.5;
+    
+    let labelX, lineEndX;
+    if (isRightHalf) {
+      labelX = -flower.petalLength - 8 - textW;
+      lineEndX = labelX + textW + paddingH;
+    } else {
+      labelX = flower.petalLength + 8;
+      lineEndX = labelX - paddingH;
+    }
+    
+    const labelY = 4;
+    
+    // Dibujar el fondo de la etiqueta
     rect(labelX - paddingH, labelY - 10.5 - paddingV, textW + (paddingH * 2), 14.5 + (paddingV * 2), 4.5);
     
+    // Dibujar la línea conectora
     stroke(81, 83, 74, textAlpha * 0.4);
     strokeWeight(1.2);
-    line(0, 0, labelX - paddingH, labelY - 3.5);
+    line(0, 0, lineEndX, labelY - 3.5);
     
+    // Dibujar el texto
     noStroke();
     fill(81, 83, 74, textAlpha);
     text(flower.text, labelX, labelY);
